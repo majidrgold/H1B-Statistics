@@ -106,12 +106,10 @@ with open("input/h1b_input.csv", "r") as csv1:
 #lineCount = 0
 for tup in getData("input/h1b_input.csv",stateIndex, jobIndex):
     #lineCount += 1
-
+    pass
 
 # In[5]:
-'''This part sorts the values of certified h1b for a specific job title and measures the percentage 
-of each job title in respect to total certified h1bs.
-'''
+#This part sorts the values of certified h1b for a specific job title and measures the percentage of each job title in respect to total certified h1bs.
 
 sorted_by_value = sorted(Job_counter.items(), key=lambda x: (-x[1],x[0]), reverse = False)
 total = sum([j[1] for j in sorted_by_value])
