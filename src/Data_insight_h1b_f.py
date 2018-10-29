@@ -1,8 +1,8 @@
-
+#!/usr/bin/python
 # coding: utf-8
 
 # In[1]:
-#!/usr/bin/python3
+
 
 #part 1
 
