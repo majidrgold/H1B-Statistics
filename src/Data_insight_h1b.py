@@ -76,8 +76,8 @@ def getData(filename1,stateIndex, jobIndex):
                 CerCount += 1
             if len(tempList[stateIndex]) not in [2]:
                 #print(counter,":",tempList[stateIndex])
-                #yield tempList,len(tempList),tempList[stateIndex] 
-                # This will give arrays of floats, for other types change dtype
+                yield tempList,len(tempList),tempList[stateIndex] 
+                # This will give arrays of floats, for other types change type
             else:
                 States_counter[tempList[stateIndex]] += 1
 
@@ -107,7 +107,7 @@ with open("input/h1b_input.csv", "r") as csv1:
 
 #part 2
 #lineCount = 0
-getData("input/h1b_input.csv",stateIndex, jobIndex)
+for tup in getData("input/h1b_input.csv",stateIndex, jobIndex):
     #lineCount += 1
 
 
@@ -128,7 +128,6 @@ with open('output/top_10_occupations.txt','w') as out:
         percent = round(100*sorted_by_value[i][1]/total, 1)
         out.write('{};{};{}%\n'.format(sorted_by_value[i][0].strip('"\''),sorted_by_value[i][1],percent))
         #SOFTWARE DEVELOPERS, APPLICATIONS;6;60.0%
-
 
 # In[6]:
 
