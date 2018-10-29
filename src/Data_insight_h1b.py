@@ -85,8 +85,8 @@ def getData(filename1,stateIndex, jobIndex):
 # In[4]:
 
 
-with open("input/h1b_input.csv", "r",encoding="utf8") as csv1:
-    reader = csv.reader(csv1,delimiter='\t') #
+with open("input/h1b_input.csv", "r") as csv1:
+    reader = csv.reader(csv1,delimiter='\t') #,encoding="utf8"
     string = ' '.join(next(reader))
     head = string.split(';')
     #print(list(enumerate(head)))
