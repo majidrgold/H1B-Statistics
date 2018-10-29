@@ -26,8 +26,7 @@ while decrement:
 
 
 # In[2]:
-'''
-This funciton is defined to overcome the unindented semicolon's problem.
+'''This funciton is defined to overcome the unindented semicolon's problem.
 Extra semicolons exists for example in address block while semicolon is used as the sepator in the csv file. 
 '''
 def remover(A):
@@ -47,8 +46,7 @@ def remover(A):
 
 # In[3]:
 
-'''
-The function gets filename1, StateIndex and jobIndex and reads csv file line by line .
+'''The function gets filename1, StateIndex and jobIndex and reads csv file line by line .
 It produces dictionaries of Job_counter ( key : job title, value : number of certified h1b in that job) and 
 States_counter ( key : States, value : number of certified h1b in the state). 
 The following function uses the remover function defined in the previous block.
@@ -88,8 +86,7 @@ def getData(filename1,stateIndex, jobIndex):
 
 # In[4]:
 
-'''
-This part finds the columns of work states and job names which
+'''This part finds the columns of work states and job names which
 will be found by two key words. Work and state are keywords for work states 
 and soc and name are key words for job titiles. 
 '''
@@ -112,8 +109,7 @@ for tup in getData("input/h1b_input.csv",stateIndex, jobIndex):
 
 
 # In[5]:
-'''
-This part sorts the values of certified h1b for a specific job title and measures the percentage 
+'''This part sorts the values of certified h1b for a specific job title and measures the percentage 
 of each job title in respect to total certified h1bs.
 '''
 
