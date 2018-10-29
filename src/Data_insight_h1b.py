@@ -1,14 +1,13 @@
-
+#!/usr/bin/python
 # coding: utf-8
 
-# In[40]:
+# In[1]:
 
 
-#!/usr/bin/python
 #part 1
 
 import csv
-import numpy as np
+#import numpy as np
 from collections import defaultdict
 import sys
 maxInt = sys.maxsize
@@ -25,7 +24,7 @@ while decrement:
         decrement = True
 
 
-# In[41]:
+# In[2]:
 
 
 def remover(A):
@@ -43,7 +42,7 @@ def remover(A):
         return C+B
 
 
-# In[42]:
+# In[3]:
 
 
 States_counter = defaultdict(int)
@@ -52,8 +51,8 @@ Job_counter = defaultdict(int)
 def getData(filename1,stateIndex, jobIndex):
     CerCount = 0
     
-    with open(filename1, "r",encoding="utf8") as csv1:
-        reader = csv.reader(csv1,delimiter='\t') #
+    with open(filename1, "r") as csv1:
+        reader = csv.reader(csv1,delimiter='\t') #,encoding="utf8"
 
         counter = 0
         for row in reader:
@@ -83,10 +82,10 @@ def getData(filename1,stateIndex, jobIndex):
     #print(CerCount)
 
 
-# In[43]:
+# In[4]:
 
 
-with open("h1b_input.csv", "r",encoding="utf8") as csv1:
+with open("input/h1b_input.csv", "r",encoding="utf8") as csv1:
     reader = csv.reader(csv1,delimiter='\t') #
     string = ' '.join(next(reader))
     head = string.split(';')
@@ -103,18 +102,18 @@ with open("h1b_input.csv", "r",encoding="utf8") as csv1:
 
 #part 2
 lineCount = 0
-for tup in getData("h1b_input.csv",stateIndex, jobIndex):
+for tup in getData("input/h1b_input.csv",stateIndex, jobIndex):
     lineCount += 1
 
 
-# In[46]:
+# In[5]:
 
 
 sorted_by_value = sorted(Job_counter.items(), key=lambda x: (-x[1],x[0]), reverse = False)
 total = sum([j[1] for j in sorted_by_value])
 sorted_by_value
 
-with open('top_10_occupations.txt','w') as out:
+with open('output/top_10_occupations.txt','w') as out:
     out.write('TOP_OCCUPATIONS;NUMBER_CERTIFIED_APPLICATIONS;PERCENTAGE\n')
     for i in range(min(len(sorted_by_value),10)):
         percent = round(100*sorted_by_value[i][1]/total, 1)
@@ -122,13 +121,13 @@ with open('top_10_occupations.txt','w') as out:
         #SOFTWARE DEVELOPERS, APPLICATIONS;6;60.0%
 
 
-# In[48]:
+# In[6]:
 
 
 sorted_by_value_states = sorted(States_counter.items(), key=lambda x: (-x[1],x[0]), reverse = False)
 total_states = sum([j[1] for j in sorted_by_value_states])
 
-with open('top_10_states.txt','w') as out:
+with open('output/top_10_states.txt','w') as out:
     out.write('TOP_STATES;NUMBER_CERTIFIED_APPLICATIONS;PERCENTAGE\n')
     for i in range(min(len(sorted_by_value_states),10)):
         percent = round(100*sorted_by_value_states[i][1]/total_states, 1)
