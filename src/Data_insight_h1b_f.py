@@ -2,13 +2,12 @@
 # coding: utf-8
 
 # In[1]:
+#!/usr/bin/python3
 
-
-#!/usr/bin/python
 #part 1
 
 import csv
-import numpy as np
+#import numpy as np
 from collections import defaultdict
 import sys
 maxInt = sys.maxsize
