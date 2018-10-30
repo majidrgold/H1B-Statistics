@@ -72,11 +72,11 @@ def getData(filename1,stateIndex, jobIndex):
                 continue
             else: 
                 CerCount += 1
-            if len(tempList[stateIndex]) not in [2]:
+            #if len(tempList[stateIndex]) not in [2]:
                 #print(counter,":",tempList[stateIndex])
                 #yield tempList,len(tempList),tempList[stateIndex] 
                 # This will give arrays of floats, for other types change type
-            else:
+            #else:
                 States_counter[tempList[stateIndex]] += 1
 
             Job_counter[tempList[jobIndex]] += 1
