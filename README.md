@@ -22,7 +22,7 @@ These instructions will get you a copy of the project up and running on your loc
 
 ### Running the Tests
 
-The **src** directory contains the source python code named **"Data_insight_h1b.py"**. The program is written in Python3. The input csv file data should be placed in the **input** directory under the name of **h1b_input.csv**. Then by runing "**run.sh**" file the results will be created and located at the **output** directory. You can run the test with the following command from within the **InsightData** folder:
+The **src** directory contains the source python code named **"Data_insight_h1b.py"**. The program is written in Python3. The input csv file data should be placed in the **input** directory under the name of **h1b_input.csv**. Then by runing "**run.sh**" file the results will be created and located at the **output** directory. You can run the program with the following command from within the **InsightData** folder:
 
 `InsightData~$ ./run.sh`
 
