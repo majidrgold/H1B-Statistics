@@ -17,7 +17,7 @@ This project processes immigration data trends on H1B(H-1B, H-1B1, E-3) visa app
 
 ## Getting Started
 
-These instructions will get you a copy of the project up and running on your local machine for development and testing purposes. See deployment for notes on how to deploy the project on a live system. Raw input data could be found [here](https://www.foreignlaborcert.doleta.gov/performancedata.cfm) under the **Disclosure Data** tab. The data is in ".xlsx" format whcih should be converted to csv file with semicolon ";" separation to be used in this program.
+These instructions will get you a copy of the project up and running on your local machine for development and testing purposes. Raw input data could be found [here](https://www.foreignlaborcert.doleta.gov/performancedata.cfm) under the **Disclosure Data** tab. The data is in ".xlsx" format whcih should be converted to csv file with semicolon ";" separation to be used in this program.
 
 ### Running the Tests
 
