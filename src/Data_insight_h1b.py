@@ -72,11 +72,11 @@ def getData(filename1,stateIndex, jobIndex):
                 continue
             else: 
                 CerCount += 1
-            #if len(tempList[stateIndex]) not in [2]:
+            if len(tempList[stateIndex]) not in [2]:
                 #print(counter,":",tempList[stateIndex])
-                #yield tempList,len(tempList),tempList[stateIndex] 
+                yield tempList,len(tempList),tempList[stateIndex] 
                 # This will give arrays of floats, for other types change type
-            #else:
+            else:
                 States_counter[tempList[stateIndex]] += 1
 
             Job_counter[tempList[jobIndex]] += 1
@@ -104,10 +104,9 @@ with open("input/h1b_input.csv", "r") as csv1:
 
 #part 2
 #lineCount = 0
-#for tup in getData("input/h1b_input.csv",stateIndex, jobIndex):
+for tup in getData("input/h1b_input.csv",stateIndex, jobIndex):
     #lineCount += 1
-   # pass
-getData("input/h1b_input.csv",stateIndex, jobIndex)
+    pass
 
 # In[5]:
 #This part sorts the values of certified h1b for a specific job title and measures the percentage of each job title in respect to total certified h1bs.
