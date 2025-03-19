@@ -124,19 +124,19 @@ class SPM:
                 )
 
                 curr_data.persist()
-                curr_data.unpersist()
 
                 bl_config = get_bl_config(st, config["baseline"])
                 bl_sts, bl_ets = extract_bl_ranges(st, bl_config)
 
                 if len(bl_sts) == 0:
+                    curr_data.unpersist()
                     continue
 
                 bl_data = []
-                for i, bl_st in enumerate(bl_sts):
+                for j, bl_st in enumerate(bl_sts):
                     bl_data_sub = data_db.read_data(
                         bl_st,
-                        bl_ets[i],
+                        bl_ets[j],
                         config=bl_config,
                         fields=list(non_gt_fields.keys()),
                     )
@@ -155,33 +155,29 @@ class SPM:
                     requires_hist = any(metric in MetricGroups.HIST_METRICS for metric in metrics)
                     
                     if requires_hist:
-                        # Try to load histogram from cache
+                        # Get timestamps for histogram cache
                         hist_bl_start = min(bl_sts).timestamp() if bl_sts else None
                         hist_bl_end = max(bl_ets).timestamp() if bl_ets else None
                         
                         if hist_bl_start is not None and hist_bl_end is not None:
-                            # Check if we need to update baseline histograms
-                            need_update = self.histogram_manager.should_update_baseline(
-                                task, field, bl_config, hist_bl_start, hist_bl_end
+                            # Try to load cached baseline histogram
+                            hist_bl, success = self.histogram_manager.load_histograms(
+                                task, field, hist_bl_start, hist_bl_end
                             )
                             
-                            if not need_update:
-                                # Try to load cached histograms
-                                hist_bl, success = self.histogram_manager.load_histograms(
-                                    task, field, hist_bl_start, hist_bl_end
+                            if success:
+                                print(f"Loaded baseline histogram for {field} from cache")
+                                # We need the bins to calculate the current histogram
+                                # Since bins information is not stored with the histogram,
+                                # we need to derive the bins using the same approach
+                                bins = analysis.metric_funcs["spark"].hist_bins(bl_data, field.replace(".", "_"))
+                                # Always calculate current histogram - it's never cached
+                                hist_curr = analysis.metric_funcs["spark"].hist_density(
+                                    [curr_data], field.replace(".", "_"), bins
                                 )
-                                
-                                if success:
-                                    print(f"Loaded histogram for {field} from cache")
-                                    # Calculate histogram for current data
-                                    bins = analysis.metric_funcs["spark"].hist_bins(bl_data, field.replace(".", "_"))
-                                    hist_curr = analysis.metric_funcs["spark"].hist_density(
-                                        [curr_data], field.replace(".", "_"), bins
-                                    )
-                                    pre_calculated_histograms[field] = (hist_curr, hist_bl)
-                            
-                            if field not in pre_calculated_histograms:
-                                # Calculate histograms and save to cache
+                                pre_calculated_histograms[field] = (hist_curr, hist_bl)
+                            else:
+                                # Calculate histograms if cache miss
                                 bins = analysis.metric_funcs["spark"].hist_bins(bl_data, field.replace(".", "_"))
                                 hist_curr = analysis.metric_funcs["spark"].hist_density(
                                     [curr_data], field.replace(".", "_"), bins
@@ -190,7 +186,7 @@ class SPM:
                                     bl_data, field.replace(".", "_"), bins
                                 )
                                 
-                                # Save baseline histogram to cache
+                                # Save only the baseline histogram to cache
                                 self.histogram_manager.save_histograms(
                                     task, field, hist_bl_start, hist_bl_end, hist_bl
                                 )
