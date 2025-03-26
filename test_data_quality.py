@@ -3,8 +3,8 @@ import numpy as np
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, FloatType, StringType
 from pyspark.sql.functions import col, isnan
-from src.analysis.data_quality import validate_data_quality_spark
-from test_metric_spark.commons import (
+from data_quality import validate_data_quality_spark
+from commons import (
     _SEED_A,
     CornerCasesQuality,
     _gen_random_values,
@@ -153,9 +153,20 @@ def pytest_generate_tests(metafunc):
     """Generate tests dynamically"""
     if "gen_data" in metafunc.fixturenames:
         if metafunc.function.__name__ == "test_data_quality":
-            test_cases = metafunc.getfixturevalue("test_cases")
-            ids = [d["case"] for d in test_cases]
-            metafunc.parametrize("gen_data", test_cases, ids=ids)
+            # Create a temporary spark session for test generation
+            spark = (
+                SparkSession.builder.appName("Test").master("local[*]").getOrCreate()
+            )
+
+            # Pass the spark session to generate_test_cases
+            tests = metafunc.module.generate_test_cases(spark)
+
+            # Parametrize with the generated tests
+            metafunc.parametrize(
+                "gen_data",
+                tests,
+                ids=lambda x: x["case"],
+            )
 
 
 @pytest.fixture
