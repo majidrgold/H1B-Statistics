@@ -1,19 +1,11 @@
-# -------
-#  Part 1:
-
-import pytest
-import numpy as np
-import math
-from pyspark.sql import SparkSession
-from pyspark.sql import Row
 import os
 import pytest
 import numpy as np
 from scipy.stats import kstest
-from pyspark.sql import SparkSession
-from .commons import _gen_random_values, _gen_classification_values
-
+from pyspark.sql import SparkSession, Row
 from pyspark.sql.types import StructType, StructField, FloatType
+
+from .commons import _gen_random_values, _gen_classification_values
 from src.analysis.metrics_spark import MetricsSpark
 from dotenv import load_dotenv
 
@@ -71,6 +63,8 @@ def _cal_tfpr(df, field, threshold):
 
 
 def _cal_hist_proportions(reference, monitored, bins):
+    if len(reference) == 0 or len(monitored) == 0:
+        return np.zeros(bins), np.zeros(bins)
     n_nulls = np.sum(monitored == None)
     r_nulls = np.sum(reference == None)
 
@@ -85,6 +79,13 @@ def _cal_hist_proportions(reference, monitored, bins):
 
 
 def _cal_psi(monitored_proportions, reference_proportions):
+    reference_proportions = np.where(
+        reference_proportions == 0, 1e-10, reference_proportions
+    )
+    monitored_proportions = np.where(
+        monitored_proportions == 0, 1e-10, monitored_proportions
+    )
+
     psi_values = (monitored_proportions - reference_proportions) * np.log(
         monitored_proportions / reference_proportions
     )
@@ -125,13 +126,22 @@ def _gen_case(case_name, metric, func, args, spark=None):
         amt_field = "amount"
 
         if metric == "vdr":
-            res = _cal_vdr(df, field, threshold, amt_field)
+            result = _cal_vdr(df, field, threshold, amt_field)
+            if isinstance(result, tuple):
+                res, tag = result  # Unpack tuple
+            else:
+                res, tag = result, None  # Single value
+        elif metric == "tfpr":
+            result = _cal_tfpr(df, field, threshold)
+            if isinstance(result, tuple):
+                res, tag = result  # Unpack tuple
+            else:
+                res, tag = result, None  # Single value
         elif metric == "tdr":
             res = _cal_tdr(df, field, threshold)
-        elif metric == "tfpr":
-            res = _cal_tfpr(df, field, threshold)
+            tag = None
         else:
-            res = None
+            res, tag = None, None
 
         return {
             "case": case_name,
@@ -144,7 +154,11 @@ def _gen_case(case_name, metric, func, args, spark=None):
             },
             "expected": {
                 "res": res,
-                "tag": args.get("tag") if isinstance(args, dict) else None,
+                "tag": (
+                    tag
+                    if tag is not None
+                    else args.get("tag") if isinstance(args, dict) else None
+                ),
             },
         }
 
@@ -177,7 +191,7 @@ def _gen_case(case_name, metric, func, args, spark=None):
         }
 
 
-def gen_data(metric, spark=None):
+def _gen_data(metric, spark=None):
     if metric in ["vdr", "tdr", "tfpr"]:
         if spark is None:
             raise ValueError(
@@ -209,7 +223,11 @@ def gen_data(metric, spark=None):
             _gen_case(
                 "null entry values",
                 metric,
-                lambda: {"values": [], "labels": [], "amt_values": []},
+                lambda: {
+                    "values": np.array([]),
+                    "labels": np.array([]),
+                    "amt_values": np.array([]),
+                },
                 spark,
             ),
             _gen_case(
@@ -249,11 +267,29 @@ def gen_data(metric, spark=None):
         raise ValueError(f"Unknown metric type: {metric}")
 
 
-data_psi = _gen_data("psi")
-data_ks = _gen_data("ks")
-data_vdr = _gen_data("vdr", spark)
-data_tdr = _gen_data("tdr", spark)
-data_tfpr = _gen_data("tfpr", spark)
+@pytest.fixture
+def data_psi():
+    return _gen_data("psi")
+
+
+@pytest.fixture
+def data_ks():
+    return _gen_data("ks")
+
+
+@pytest.fixture
+def data_vdr(spark):
+    return _gen_data("vdr", spark)
+
+
+@pytest.fixture
+def data_tdr(spark):
+    return _gen_data("tdr", spark)
+
+
+@pytest.fixture
+def data_tfpr(spark):
+    return _gen_data("tfpr", spark)
 
 
 @pytest.fixture()
@@ -262,7 +298,10 @@ def gen_data(request):
 
 
 @pytest.mark.parametrize(
-    "gen_data", argvalues=data_psi, indirect=True, ids=[t["case"] for t in data_psi]
+    "gen_data",
+    lambda request: request.getfixturevalue("data_psi"),
+    indirect=True,
+    ids=lambda t: t["case"],
 )
 def test_hist_density(spark, gen_data):
     inputs, expected = gen_data
@@ -286,64 +325,103 @@ def test_hist_density(spark, gen_data):
 
 
 @pytest.mark.parametrize(
-    "gen_data", argvalues=data_psi, indirect=True, ids=[t["case"] for t in data_psi]
+    "gen_data",
+    lambda request: request.getfixturevalue("data_psi"),
+    indirect=True,
+    ids=lambda t: t["case"],
 )
 def test_psi(gen_data):
     inputs, expected = gen_data
     res = MetricsSpark.psi(inputs["hist_data"], inputs["hist_bl"])
     if expected["res"] is None:
-        assert res == expected["res"]
+        assert res is None
     else:
         assert np.isclose(res, expected["res"], rtol=1e-4)
 
 
 @pytest.mark.parametrize(
-    "gen_data", argvalues=data_ks, indirect=True, ids=[t["case"] for t in data_ks]
+    "gen_data",
+    lambda request: request.getfixturevalue("data_ks"),
+    indirect=True,
+    ids=lambda t: t["case"],
 )
 def test_ks(gen_data):
     inputs, expected = gen_data
     res = MetricsSpark.ks(inputs["hist_data"][2:], inputs["hist_bl"][2:])
     if expected["res"] is None:
-        assert res == expected["res"]
+        assert res is None
     else:
         assert np.isclose(res, expected["res"][0], rtol=1e-4)
 
 
 @pytest.mark.parametrize(
-    "gen_data", argvalues=data_vdr, indirect=True, ids=[t["case"] for t in data_vdr]
+    "gen_data",
+    lambda request: request.getfixturevalue("data_vdr"),
+    indirect=True,
+    ids=lambda t: t["case"],
 )
 def test_vdr(spark, gen_data):
-    df = gen_data["inputs"]["df"]
-    field = gen_data["inputs"]["field"]
-    threshold = gen_data["inputs"]["threshold"]
-    amt_field = gen_data["inputs"]["amt_field"]
+    inputs, expected = gen_data
+
+    df = inputs["df"]
+    field = inputs["field"]
+    threshold = inputs["threshold"]
+    amt_field = inputs["amt_field"]
+
     res, tag = MetricsSpark.vdr(df, field, threshold, amt_field)
-    assert np.isclose(res, gen_data["expected"]["res"], rtol=1e-4)
-    if "tag" in gen_data["expected"]:
-        assert tag == gen_data["expected"]["tag"]
+
+    if expected["res"] is None:
+        assert res is None
+    else:
+        assert np.isclose(res, expected["res"], rtol=1e-4)
+
+    if "tag" in expected and expected["tag"] is not None:
+        assert tag == expected["tag"]
 
 
 @pytest.mark.parametrize(
-    "gen_data", argvalues=data_tdr, indirect=True, ids=[t["case"] for t in data_tdr]
+    "gen_data",
+    lambda request: request.getfixturevalue("data_tdr"),
+    indirect=True,
+    ids=lambda t: t["case"],
 )
 def test_tdr(spark, gen_data):
-    df = gen_data["inputs"]["df"]
-    field = gen_data["inputs"]["field"]
-    threshold = gen_data["inputs"]["threshold"]
+    inputs, expected = gen_data
+
+    df = inputs["df"]
+    field = inputs["field"]
+    threshold = inputs["threshold"]
+
     res, tag = MetricsSpark.tdr(df, field, threshold)
-    assert np.isclose(res, gen_data["expected"]["res"], rtol=1e-4)
-    if "tag" in gen_data["expected"]:
-        assert tag == gen_data["expected"]["tag"]
+
+    if expected["res"] is None:
+        assert res is None
+    else:
+        assert np.isclose(res, expected["res"], rtol=1e-4)
+
+    if "tag" in expected and expected["tag"] is not None:
+        assert tag == expected["tag"]
 
 
 @pytest.mark.parametrize(
-    "gen_data", argvalues=data_tfpr, indirect=True, ids=[t["case"] for t in data_tfpr]
+    "gen_data",
+    lambda request: request.getfixturevalue("data_tfpr"),
+    indirect=True,
+    ids=lambda t: t["case"],
 )
 def test_tfpr(spark, gen_data):
-    df = gen_data["inputs"]["df"]
-    field = gen_data["inputs"]["field"]
-    threshold = gen_data["inputs"]["threshold"]
+    inputs, expected = gen_data
+
+    df = inputs["df"]
+    field = inputs["field"]
+    threshold = inputs["threshold"]
+
     res, tag = MetricsSpark.tfpr(df, field, threshold)
-    assert np.isclose(res, gen_data["expected"]["res"], rtol=1e-4)
-    if "tag" in gen_data["expected"]:
-        assert tag == gen_data["expected"]["tag"]
+
+    if expected["res"] is None:
+        assert res is None
+    else:
+        assert np.isclose(res, expected["res"], rtol=1e-4)
+
+    if "tag" in expected and expected["tag"] is not None:
+        assert tag == expected["tag"]
