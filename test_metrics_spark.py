@@ -433,6 +433,7 @@ class ShapMetricsSpark:
     
     @staticmethod
     def load_model(model_path: str) -> Tuple[xgb.XGBClassifier, List[str]]:
+        """Loads XGBoost model and returns model object and feature list"""
         model = xgb.XGBClassifier()
         model.load_model(model_path)
         features = model.get_booster().feature_names
@@ -457,6 +458,19 @@ class ShapMetricsSpark:
                   top_pct: float = 0.05, n_rows: int = None, 
                   abs_val: bool = False, score_col: str = 'model_score', 
                   nthread: int = None) -> DataFrame:
+        """
+        Calculates SHAP values for top-scoring rows in the DataFrame
+        
+        Args:
+            model_path: Path to XGBoost model file
+            df: Input DataFrame
+            features: Feature columns (if None, extracted from model)
+            top_pct: Percentage of top rows to use (default 5%)
+            n_rows: Fixed number of top rows (overrides top_pct)
+            abs_val: Whether to return absolute SHAP values
+            score_col: Column with model scores
+            nthread: Threading control for XGBoost
+        """
         model, model_features = ShapMetricsSpark.load_model(model_path)
         features = features or model_features
         
@@ -486,6 +500,7 @@ class ShapMetricsSpark:
     def avg_shap_by_date(model_path: str, df: DataFrame, date_col: str,
                        features: List[str] = None, top_pct: float = 0.05, 
                        abs_val: bool = False, score_col: str = 'model_score') -> DataFrame:
+        """Calculates average SHAP values by date"""
         if features is None:
             _, features = ShapMetricsSpark.load_model(model_path)
         
@@ -511,6 +526,16 @@ class ShapMetricsSpark:
     @staticmethod
     def conf_intervals(shap_df: DataFrame, date_col: str, start_date: str = None, 
                      end_date: str = None, conf_level: float = 2.0) -> DataFrame:
+        """
+        Calculates confidence intervals for SHAP values over time
+        
+        Args:
+            shap_df: DataFrame with SHAP values by date
+            date_col: Column containing date values
+            start_date: Start of reference period (optional)
+            end_date: End of reference period (optional)
+            conf_level: Multiplier for standard deviation (default 2.0 ≈ 95% CI)
+        """
         filtered_df = shap_df
         if start_date and end_date:
             filtered_df = shap_df.filter(
