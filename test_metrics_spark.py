@@ -408,7 +408,148 @@ def test_tfpr(spark, gen_data):
 
     res, tag = MetricsSpark.tfpr(df, inputs["field"], inputs["threshold"])
 
+
+
     if expected["res"] is not None:
         assert np.isclose(res, expected["res"], rtol=1e-4) or res is None
     if expected["tag"] is not None:
         assert tag == expected["tag"]
+
+
+
+---
+
+import xgboost as xgb
+import numpy as np
+import pandas as pd
+from pyspark.sql import DataFrame
+from pyspark.sql import functions as F
+from pyspark.sql.functions import col, lit, monotonically_increasing_id
+from pyspark.sql.types import FloatType, StructType, StructField
+from typing import List, Tuple
+
+
+class ShapMetricsSpark:
+    
+    @staticmethod
+    def load_model(model_path: str) -> Tuple[xgb.XGBClassifier, List[str]]:
+        model = xgb.XGBClassifier()
+        model.load_model(model_path)
+        features = model.get_booster().feature_names
+        return model, features
+    
+    @staticmethod
+    def predict_scores(model, df: DataFrame, features: List[str], score_col: str = 'model_score') -> DataFrame:
+        features_pd = df.select(features).toPandas()
+        probas = model.predict_proba(features_pd)[:, 1]
+        probas_array = [[float(p)] for p in probas]
+        
+        schema = StructType([StructField(score_col, FloatType(), False)])
+        probas_df = df.sparkSession.createDataFrame(probas_array, schema)
+        
+        df_with_id = df.withColumn("_row_id", monotonically_increasing_id())
+        probas_with_id = probas_df.withColumn("_row_id", monotonically_increasing_id())
+        
+        return df_with_id.join(probas_with_id, "_row_id").drop("_row_id")
+    
+    @staticmethod
+    def shap_values(model_path: str, df: DataFrame, features: List[str] = None, 
+                  top_pct: float = 0.05, n_rows: int = None, 
+                  abs_val: bool = False, score_col: str = 'model_score', 
+                  nthread: int = None) -> DataFrame:
+        model, model_features = ShapMetricsSpark.load_model(model_path)
+        features = features or model_features
+        
+        if score_col not in df.columns:
+            df = ShapMetricsSpark.predict_scores(model, df, features, score_col)
+        
+        rows_to_keep = n_rows if n_rows else int(df.count() * top_pct)
+        top_df = df.orderBy(F.col(score_col).desc()).limit(rows_to_keep)
+        features_pd = top_df.select(features).toPandas()
+        
+        dmatrix = xgb.DMatrix(
+            features_pd,
+            missing=np.nan,
+            nthread=nthread,
+        )
+        
+        shap_contributions = model.get_booster().predict(dmatrix, pred_contribs=True)
+        if abs_val:
+            shap_contributions = np.abs(shap_contributions)
+        
+        shap_values = shap_contributions[:, :-1]  # Remove bias column
+        shap_df = pd.DataFrame(shap_values, columns=features)
+        
+        return df.sparkSession.createDataFrame(shap_df)
+    
+    @staticmethod
+    def avg_shap_by_date(model_path: str, df: DataFrame, date_col: str,
+                       features: List[str] = None, top_pct: float = 0.05, 
+                       abs_val: bool = False, score_col: str = 'model_score') -> DataFrame:
+        if features is None:
+            _, features = ShapMetricsSpark.load_model(model_path)
+        
+        dates = [row[date_col] for row in df.select(date_col).distinct().collect()]
+        result_rows = []
+        
+        for date in dates:
+            date_df = df.filter(col(date_col) == date)
+            shap_df = ShapMetricsSpark.shap_values(
+                model_path, date_df, features, top_pct, None, abs_val, score_col
+            )
+            
+            avg_values = shap_df.select([F.avg(c).alias(c) for c in features]).collect()[0]
+            
+            row_dict = {date_col: date}
+            for feature in features:
+                row_dict[feature] = float(avg_values[feature])
+            
+            result_rows.append(row_dict)
+        
+        return df.sparkSession.createDataFrame(result_rows)
+    
+    @staticmethod
+    def conf_intervals(shap_df: DataFrame, date_col: str, start_date: str = None, 
+                     end_date: str = None, conf_level: float = 2.0) -> DataFrame:
+        filtered_df = shap_df
+        if start_date and end_date:
+            filtered_df = shap_df.filter(
+                (F.col(date_col) >= start_date) & 
+                (F.col(date_col) <= end_date)
+            )
+        
+        feature_cols = [c for c in filtered_df.columns if c != date_col]
+        result_rows = []
+        
+        for feature in feature_cols:
+            stats = filtered_df.select(
+                F.avg(feature).alias("mean"),
+                F.stddev(feature).alias("std_dev")
+            ).collect()[0]
+            
+            mean_val = float(stats["mean"])
+            std_val = float(stats["std_dev"])
+            lower_ci = mean_val - conf_level * std_val
+            upper_ci = mean_val + conf_level * std_val
+            
+            result_rows.append({
+                "feature": feature,
+                "mean": mean_val,
+                "std_dev": std_val,
+                "lower_ci": lower_ci,
+                "upper_ci": upper_ci
+            })
+        
+        return shap_df.sparkSession.createDataFrame(result_rows)
+
+
+---
+from metrics_spark import MetricsSpark
+from shap_metrics_spark import ShapMetricsSpark
+
+# Use general metrics
+bins = MetricsSpark.hist_bins(df, "score", 30)
+psi_value = MetricsSpark.psi(hist_a, hist_b)
+
+# Use SHAP-specific metrics
+shap_values = ShapMetricsSpark.shap_values(model_path, df, top_pct=0.05)
